@@ -1,85 +1,107 @@
 "use client";
-import { useAuth } from "@/context/AuthUserContext";
+
+import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
 import axios from "axios";
-import styles from '../register/Register.module.css';
-import { Eye, EyeOff } from "lucide-react";
 import toast from "react-hot-toast";
-import { getAuth } from "firebase/auth";
 import { motion } from "framer-motion";
 
+import { useAuth } from "@/context/AuthUserContext";
+import { FormInput, PasswordInput, LoadingPage } from "@/components/ui";
+import styles from "../register/Register.module.css";
+
 export default function LogIn() {
-  const { authUser, loading, signInWithGoogle, signInWithEmail, signOutUser } = useAuth();
+  const { authUser, loading, signInWithEmail } = useAuth();
+  const router = useRouter();
 
   const [formData, setFormData] = useState({
     email: "",
     password: "",
   });
-
-  const router = useRouter();
-  const [isDisabled, setDisabled] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
 
+  // Check if user is already logged in
   useEffect(() => {
-    async function check() {
-      if (authUser) {
+    async function checkAuth() {
+      if (!authUser) return;
+
+      try {
         const token = await authUser.getIdToken(true);
-        try {
-          const response = await axios.post('/api/login', {}, {
-            headers: { 'Authorization': `Bearer ${token}` }
-          });
-          if (response.data.success) {
-            if (response.data.role == 'user') router.replace("/profile");
-            if (response.data.role == 'admin') router.replace("/admin");
-          }
-          return true;
-        } catch (e) {
-          console.error(e);
-          return false;
+        const response = await axios.post(
+          "/api/login",
+          {},
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+
+        if (response.data.success) {
+          const route = response.data.role === "admin" ? "/admin" : "/profile";
+          router.replace(route);
         }
+      } catch (error) {
+        console.error("Auth check failed:", error);
       }
     }
-    check();
+
+    checkAuth();
   }, [authUser, router]);
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setDisabled(true);
-    if (!formData.email || !formData.password) {
-      toast.error("All fields are required!");
-      setDisabled(false);
-      return;
-    }
+  const handleChange = useCallback((e) => {
+    const { name, value } = e.target;
+    setFormData((prev) => ({ ...prev, [name]: value }));
+  }, []);
 
-    try {
-      const auth = getAuth();
-      const userCredential = await signInWithEmail(formData.email, formData.password);
-      const token = await userCredential.user.getIdToken();
-      const response = await axios.post(
-        "/api/login",
-        { name: formData.name },
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
+  const togglePasswordVisibility = useCallback(() => {
+    setShowPassword((prev) => !prev);
+  }, []);
 
-      if (response.data.success) {
-        toast.success("Login successfully!");
-        router.push("/profile");
-      } else {
-        toast.error(response.data.message || "Login failed");
+  const handleSubmit = useCallback(
+    async (e) => {
+      e.preventDefault();
+      setIsSubmitting(true);
+
+      const { email, password } = formData;
+
+      if (!email || !password) {
+        toast.error("All fields are required!");
+        setIsSubmitting(false);
+        return;
       }
-    } catch (err) {
-      console.error(err);
-      toast.error("Login failed");
-    } finally {
-      setDisabled(false);
-    }
-  };
 
-  if (loading) return <>loading</>;
+      try {
+        const userCredential = await signInWithEmail(email, password);
+        const token = await userCredential.user.getIdToken();
+
+        const response = await axios.post(
+          "/api/login",
+          {},
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+
+        if (response.data.success) {
+          toast.success("Login successful!");
+          router.push("/profile");
+        } else {
+          toast.error(response.data.message || "Login failed");
+        }
+      } catch (error) {
+        console.error("Login error:", error);
+        toast.error("Login failed. Please check your credentials.");
+      } finally {
+        setIsSubmitting(false);
+      }
+    },
+    [formData, signInWithEmail, router]
+  );
+
+  if (loading) {
+    return <LoadingPage message="Checking authentication..." />;
+  }
 
   return (
-    <div className={`bg-muted flex min-h-svh gap-8 items-center justify-center p-6 md:p-10 ${styles.background} text-white overflow-x-hidden`}>
+    <div
+      className={`bg-muted flex min-h-svh gap-8 items-center justify-center p-6 md:p-10 ${styles.background} text-white overflow-x-hidden`}
+    >
       <div className="flex flex-col items-center justify-center w-full max-w-full px-2">
         <motion.div
           initial={{ opacity: 0, x: -40 }}
@@ -87,7 +109,9 @@ export default function LogIn() {
           transition={{ duration: 0.5 }}
           className="h-full w-full p-2"
         >
-          <h1 className="font-bold text-7xl text-grad p-2 race text-center">LOGIN</h1>
+          <h1 className="font-bold text-7xl text-grad p-2 race text-center">
+            LOGIN
+          </h1>
         </motion.div>
 
         <motion.form
@@ -98,51 +122,34 @@ export default function LogIn() {
           className={`h-full w-full max-w-md sm:w-[90%] lg:w-[25vw] flex flex-col items-center gap-8 justify-center px-4 py-6 ${styles.glassCard}`}
         >
           <div className="flex flex-col gap-8 w-full">
-            {/* Email */}
-            <div className="flex flex-col gap-2 text-xl w-full">
-              <label htmlFor="email">Email</label>
-              <input
-                type="email"
-                name="email"
-                placeholder="Enter Your email"
-                value={formData.email}
-                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                className="p-2 border-2 rounded-lg text-white w-full focus:outline-none focus:ring-0 focus:border-teal-600"
-                required
-              />
-            </div>
+            <FormInput
+              type="email"
+              name="email"
+              label="Email"
+              placeholder="Enter your email"
+              value={formData.email}
+              onChange={handleChange}
+              required
+            />
 
-            {/* Password */}
-            <div className="flex flex-col gap-2 text-xl w-full">
-              <label htmlFor="password">Password</label>
-              <div className="relative w-full">
-                <input
-                  type={showPassword ? "text" : "password"}
-                  name="password"
-                  placeholder="Enter Your password"
-                  value={formData.password}
-                  onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                  required
-                  className="p-2 pr-10 border-2 rounded-lg text-white w-full focus:outline-none focus:ring-0 focus:border-teal-600"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-2 top-1/2 transform -translate-y-1/2 text-white"
-                >
-                  {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
-                </button>
-              </div>
-            </div>
+            <PasswordInput
+              name="password"
+              label="Password"
+              placeholder="Enter your password"
+              value={formData.password}
+              onChange={handleChange}
+              showPassword={showPassword}
+              onToggleVisibility={togglePasswordVisibility}
+              required
+            />
           </div>
 
-          {/* Login button */}
           <button
-            className={`${styles["btn"]} ${isDisabled ? "opacity-50" : ""} w-full`}
+            className={`${styles.btn} ${isSubmitting ? "opacity-50" : ""} w-full`}
             type="submit"
-            disabled={isDisabled}
+            disabled={isSubmitting}
           >
-            {isDisabled ? "Logging In..." : "Login"}
+            {isSubmitting ? "Logging In..." : "Login"}
           </button>
         </motion.form>
       </div>

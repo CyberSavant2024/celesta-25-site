@@ -1,17 +1,19 @@
 "use client";
 
-import EventCard from "./events/event-card";
-import EventModal from "./events/event-modal";
-
+import { useRef, useEffect, useState, useCallback, useMemo } from "react";
 import Image from "next/image";
-import styles from "./Home.module.css";
-import { ArrowDown, Link } from "lucide-react";
-import { useRef, useEffect, useState } from "react";
 import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
-import data from "./events/events.json";
 import { Swiper, SwiperSlide } from "swiper/react";
 import { Autoplay, Navigation } from "swiper/modules";
+import { ArrowDown } from "lucide-react";
+
+import EventCard from "./events/event-card";
+import EventModal from "./events/event-modal";
+import styles from "./Home.module.css";
+import data from "./events/events.json";
+import { PERFORMERS, SWIPER_CONFIG, THEME_CONTENT } from "@/lib/constants";
+
 import "swiper/css";
 import "swiper/css/navigation";
 
@@ -19,60 +21,36 @@ gsap.registerPlugin(ScrollTrigger);
 
 export default function Home() {
   const [selectedEvent, setSelectedEvent] = useState(null);
-
-  const events = data["events"];
-  const fadeRef = useRef(null);
   const [isMuted, setIsMuted] = useState(true);
-  const videoRef = useRef(null);
+  const [currentIndices, setCurrentIndices] = useState(() => 
+    PERFORMERS.map(() => 0)
+  );
 
-  // Refs for performer slideshow images (using useRef instead of DOM queries)
+  // Refs
+  const fadeRef = useRef(null);
+  const videoRef = useRef(null);
   const performerCurrentRefs = useRef([]);
   const performerNextRefs = useRef([]);
   const performerNameRefs = useRef([]);
-  const [currentIndices, setCurrentIndices] = useState([0, 0, 0, 0]);
 
-  const toggleAudio = () => {
+  // Memoized data
+  const events = useMemo(() => data["events"], []);
+
+  // Callbacks
+  const toggleAudio = useCallback(() => {
     if (videoRef.current) {
       videoRef.current.muted = !isMuted;
-      setIsMuted(!isMuted);
+      setIsMuted((prev) => !prev);
     }
-  };
+  }, [isMuted]);
 
-  // Performers data
-  const performers = [
-    {
-      images: [
-        "/images/artists/irfan_1.jpg",
-        "/images/artists/irfan_2.jpg",
-        "/images/artists/irfan_3.jpg",
-      ],
-      name: "Mohammed Irfan",
-    },
-    {
-      images: [
-        "/images/artists/bassi_1.jpg",
-        "/images/artists/bassi_2.webp",
-        "/images/artists/bassi_3.webp",
-      ],
-      name: "Anubhav Singh Bassi",
-    },
-    {
-      images: [
-        "/images/artists/kapoor_1.png",
-        "/images/artists/kapoor_2.png",
-        "/images/artists/kapoor_3.jpg",
-      ],
-      name: "Gaurav Kapoor",
-    },
-    {
-      images: [
-        "/images/artists/artist4-1.jpg",
-        "/images/artists/artist4-2.jpg",
-        "/images/artists/artist4-3.jpg",
-      ],
-      name: "Aaditya Kulshreshth",
-    },
-  ];
+  const handleEventSelect = useCallback((event) => {
+    setSelectedEvent(event);
+  }, []);
+
+  const handleEventClose = useCallback(() => {
+    setSelectedEvent(null);
+  }, []);
 
   // Fade-in sections on scroll
   useEffect(() => {
@@ -108,9 +86,9 @@ export default function Home() {
 
   // Image slideshow using refs instead of DOM queries
   useEffect(() => {
-    const animatingFlags = performers.map(() => false);
+    const animatingFlags = PERFORMERS.map(() => false);
 
-    const intervals = performers.map((performer, idx) => {
+    const intervals = PERFORMERS.map((performer, idx) => {
       return setInterval(() => {
         if (animatingFlags[idx]) return;
 
@@ -161,11 +139,11 @@ export default function Home() {
     });
 
     return () => intervals.forEach((interval) => clearInterval(interval));
-  }, [performers]);
+  }, []);
 
   // Animate performer names sliding from left/right using refs
   useEffect(() => {
-    performers.forEach((performer, idx) => {
+    PERFORMERS.forEach((performer, idx) => {
       const el = performerNameRefs.current[idx];
       if (!el) return;
 
@@ -187,7 +165,7 @@ export default function Home() {
         }
       );
     });
-  }, [performers]);
+  }, []);
 
   return (
     <div className="overflow-x-hidden w-full">
@@ -214,7 +192,7 @@ export default function Home() {
           Past Performers
         </h1>
         <div className="w-full">
-          {performers.map((performer, idx) => (
+          {PERFORMERS.map((performer, idx) => (
             <div
               key={idx}
               className="relative w-full h-[500px] overflow-hidden reveal-section"
@@ -263,7 +241,6 @@ export default function Home() {
 
       <div className={`w-full ${styles.background2} py-16 px-4 md:px-20`}>
         <section className="max-w-5xl mx-auto text-center mb-16">
-
           {/* Small label */}
           <h3 className="text-white text-4xl uppercase text-center mb-8 state-wide">
             Theme
@@ -321,27 +298,15 @@ export default function Home() {
 
           <Swiper
             modules={[Autoplay, Navigation]}
-            spaceBetween={24}
-            slidesPerView={1}
-            autoplay={{
-              delay: 2500,
-              disableOnInteraction: false,
-            }}
+            {...SWIPER_CONFIG}
             navigation
-            breakpoints={{
-              640: { slidesPerView: 2 },
-              1024: { slidesPerView: 3 },
-            }}
             className="px-4 events-swiper"
-            centeredSlides
-            loop
-            grabCursor
           >
             {events.map((event, idx) => (
               <SwiperSlide key={idx}>
                 <EventCard
                   event={event}
-                  onClick={() => setSelectedEvent(event)}
+                  onClick={() => handleEventSelect(event)}
                 />
               </SwiperSlide>
             ))}
@@ -350,7 +315,7 @@ export default function Home() {
           {selectedEvent && (
             <EventModal
               event={selectedEvent}
-              onClose={() => setSelectedEvent(null)}
+              onClose={handleEventClose}
             />
           )}
         </section>

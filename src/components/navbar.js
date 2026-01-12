@@ -1,80 +1,127 @@
 "use client";
-import Link from 'next/link';
-import Image from 'next/image';
-import { useState } from 'react';
 
-export default function Navbar() {
-    const [isMenuOpen, setIsMenuOpen] = useState(false);
+import { memo, useCallback } from "react";
+import Link from "next/link";
+import Image from "next/image";
+import { useToggleMenu } from "@/hooks";
+import { NAV_LINKS } from "@/lib/constants";
 
-    const toggleMenu = () => {
-        setIsMenuOpen(!isMenuOpen);
-    };
+// Navigation link component
+const NavLink = memo(function NavLink({ href, children, onClick, className = "" }) {
+  return (
+    <Link
+      href={href}
+      className={`opacity-80 hover:opacity-100 transition ${className}`}
+      onClick={onClick}
+    >
+      {children}
+    </Link>
+  );
+});
 
-    const closeMenu = () => {
-        setIsMenuOpen(false);
-    };
+// Mobile hamburger button
+const HamburgerButton = memo(function HamburgerButton({ isOpen, onClick }) {
+  return (
+    <button
+      className="md:hidden flex flex-col justify-center items-center w-8 h-8 space-y-1.5"
+      onClick={onClick}
+      aria-label="Toggle menu"
+    >
+      <span
+        className={`block w-6 h-0.5 bg-white transition-transform duration-300 ${
+          isOpen ? "rotate-45 translate-y-2" : ""
+        }`}
+      />
+      <span
+        className={`block w-6 h-0.5 bg-white transition-opacity duration-300 ${
+          isOpen ? "opacity-0" : ""
+        }`}
+      />
+      <span
+        className={`block w-6 h-0.5 bg-white transition-transform duration-300 ${
+          isOpen ? "-rotate-45 -translate-y-2" : ""
+        }`}
+      />
+    </button>
+  );
+});
 
-    return (
-        <header className="fixed top-6 left-1/2 -translate-x-1/2 z-50 w-full max-w-6xl">
-            <nav className="mx-4 flex items-center justify-between rounded-full bg-black/20 p-3 text-white backdrop-blur-xl border border-white/10 shadow-lg">
-                <Link href="/" className="flex items-center gap-3" onClick={closeMenu}>
-                    <Image
-                        src="/images/celesta-icon.svg"
-                        alt="Celesta Logo"
-                        width={35}
-                        height={35}
-                    />
-                    <Image
-                        src="/images/typeface-navbar.png"
-                        alt="Celesta"
-                        width={110}
-                        height={35}
-                        className="-translate-y-1 h-auto"
-                    />
-                </Link>
+const Navbar = memo(function Navbar() {
+  const { isOpen, toggle, close } = useToggleMenu();
 
-                {/* Desktop Navigation */}
-                <div className="hidden md:flex items-center gap-6 state-wide text-xs uppercase text-white">
-                    <Link href="/" className="opacity-80 hover:opacity-100 transition">Home</Link>
-                    <Link href="/events" className="opacity-80 hover:opacity-100 transition">Events</Link>
-                    <Link href="/spons" className="opacity-80 hover:opacity-100 transition">Sponsors</Link>
-                    <Link href="/workshop" className="opacity-80 hover:opacity-100 transition">Workshops</Link>
-                    <Link href="/team" className="opacity-80 hover:opacity-100 transition">Team</Link>
-                    <Link href="/gallery" className="opacity-80 hover:opacity-100 transition">Gallery</Link>
-                    <Link href="/login" className="rounded-full border-2 border-teal-500 px-5 py-2 opacity-80 hover:opacity-100 hover:bg-teal-500 hover:text-black transition">Login</Link>
-                    <Link href="/register" className="rounded-full bg-teal-500 px-5 py-2 text-black hover:bg-teal-400 transition">Register</Link>
-                </div>
+  const handleLinkClick = useCallback(() => {
+    close();
+  }, [close]);
 
-                {/* Mobile Hamburger Menu Button */}
-                <button
-                    className="md:hidden flex flex-col justify-center items-center w-8 h-8 space-y-1.5"
-                    onClick={toggleMenu}
-                    aria-label="Toggle menu"
+  return (
+    <header className="fixed top-6 left-1/2 -translate-x-1/2 z-50 w-full max-w-6xl">
+      <nav className="mx-4 flex items-center justify-between rounded-full bg-black/20 p-3 text-white backdrop-blur-xl border border-white/10 shadow-lg">
+        {/* Logo */}
+        <Link href="/" className="flex items-center gap-3" onClick={handleLinkClick}>
+          <Image
+            src="/images/celesta-icon.svg"
+            alt="Celesta Logo"
+            width={35}
+            height={35}
+          />
+          <Image
+            src="/images/typeface-navbar.png"
+            alt="Celesta"
+            width={110}
+            height={35}
+            className="-translate-y-1 h-auto"
+          />
+        </Link>
+
+        {/* Desktop Navigation */}
+        <div className="hidden md:flex items-center gap-6 state-wide text-xs uppercase text-white">
+          {NAV_LINKS.map((link) => (
+            <NavLink
+              key={link.href}
+              href={link.href}
+              className={link.className || ""}
+            >
+              {link.label}
+            </NavLink>
+          ))}
+        </div>
+
+        {/* Mobile Hamburger Menu Button */}
+        <HamburgerButton isOpen={isOpen} onClick={toggle} />
+      </nav>
+
+      {/* Mobile Menu */}
+      {isOpen && (
+        <div className="md:hidden absolute top-full left-4 right-4 mt-2 rounded-2xl bg-black/30 backdrop-blur-xl border border-white/10 shadow-lg animate-in slide-in-from-top-2 duration-300 text-white font-bold">
+          <div className="p-6 space-y-4 state-wide text-xs uppercase">
+            {NAV_LINKS.filter((link) => !link.isButton).map((link) => (
+              <NavLink
+                key={link.href}
+                href={link.href}
+                onClick={handleLinkClick}
+                className="block py-2"
+              >
+                {link.label}
+              </NavLink>
+            ))}
+            <div className="pt-4 space-y-3">
+              {NAV_LINKS.filter((link) => link.isButton).map((link) => (
+                <NavLink
+                  key={link.href}
+                  href={link.href}
+                  onClick={handleLinkClick}
+                  className={`block text-center ${link.className || ""}`}
                 >
-                    <span className={`block w-6 h-0.5 bg-white transition-transform duration-300 ${isMenuOpen ? 'rotate-45 translate-y-2' : ''}`}></span>
-                    <span className={`block w-6 h-0.5 bg-white transition-opacity duration-300 ${isMenuOpen ? 'opacity-0' : ''}`}></span>
-                    <span className={`block w-6 h-0.5 bg-white transition-transform duration-300 ${isMenuOpen ? '-rotate-45 -translate-y-2' : ''}`}></span>
-                </button>
-            </nav>
+                  {link.label}
+                </NavLink>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+    </header>
+  );
+});
 
-            {/* Mobile Menu */}
-            {isMenuOpen && (
-                <div className="md:hidden absolute top-full left-4 right-4 mt-2 rounded-2xl bg-black/30 backdrop-blur-xl border border-white/10 shadow-lg animate-in slide-in-from-top-2 duration-300 text-white font-bold">
-                    <div className="p-6 space-y-4 state-wide text-xs uppercase">
-                        <Link href="/" className="block py-2 opacity-80 hover:opacity-100 transition" onClick={closeMenu}>Home</Link>
-                        <Link href="/events" className="block py-2 opacity-80 hover:opacity-100 transition" onClick={closeMenu}>Events</Link>
-                        <Link href="/spons" className="block py-2 opacity-80 hover:opacity-100 transition" onClick={closeMenu}>Sponsors</Link>
-                        <Link href="/workshop" className="block py-2 opacity-80 hover:opacity-100 transition" onClick={closeMenu}>Workshops</Link>
-                        <Link href="/team" className="block py-2 opacity-80 hover:opacity-100 transition" onClick={closeMenu}>Team</Link>
-                        <Link href="/gallery" className="block py-2 opacity-80 hover:opacity-100 transition" onClick={closeMenu}>Gallery</Link>
-                        <div className="pt-4 space-y-3">
-                            <Link href="/login" className="block text-center rounded-full border-2 border-teal-500 px-5 py-2 opacity-80 hover:opacity-100 hover:bg-teal-500 hover:text-black transition" onClick={closeMenu}>Login</Link>
-                            <Link href="/register" className="block text-center rounded-full bg-teal-500 px-5 py-2 text-black hover:bg-teal-400 transition" onClick={closeMenu}>Register</Link>
-                        </div>
-                    </div>
-                </div>
-            )}
-        </header>
-    );
-}
+export default Navbar;
 

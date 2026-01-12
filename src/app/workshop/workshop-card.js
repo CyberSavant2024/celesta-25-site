@@ -1,13 +1,13 @@
+import { memo } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import styles from './Workshops.module.css';
+import styles from "./Workshops.module.css";
 
-export default function WorkshopCard({ name, img_src, register_link }) {
+const WorkshopCard = memo(function WorkshopCard({ name, img_src, register_link }) {
   return (
     <div className={styles.eventCardWrapper}>
       <div className={styles.eventCardBorder}></div>
       <div className={styles.eventCardContent}>
-
         {/* Image Section */}
         <div className={styles.eventImageContainer}>
           <Image
@@ -31,8 +31,11 @@ export default function WorkshopCard({ name, img_src, register_link }) {
             Register
           </Link>
         </div>
-
       </div>
     </div>
   );
-}
+});
+
+WorkshopCard.displayName = "WorkshopCard";
+
+export default WorkshopCard;
