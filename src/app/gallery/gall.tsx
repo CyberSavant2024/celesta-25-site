@@ -1,5 +1,6 @@
 "use client";
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, memo, useCallback } from "react";
+import Image from "next/image";
 import {
     motion,
     useScroll,
@@ -27,7 +28,8 @@ const HeroParallax = ({ products }: { products: Product[] }) => {
         offset: ["start start", "end start"],
     });
 
-    const springConfig = { stiffness: 100, damping: 20 };
+    // Optimized spring config for smooth animations
+    const springConfig = { stiffness: 120, damping: 30, restDelta: 0.001 };
 
     const translateX = useSpring(
         useTransform(scrollYProgress, [0, 1], [0, 500]),
@@ -55,25 +57,25 @@ const HeroParallax = ({ products }: { products: Product[] }) => {
     );
     const [selectedProductIndex, setSelectedProductIndex] = useState<number | null>(null);
 
-    const openModal = (index: number) => {
+    const openModal = useCallback((index: number) => {
         setSelectedProductIndex(index);
-    };
+    }, []);
 
-    const closeModal = () => {
+    const closeModal = useCallback(() => {
         setSelectedProductIndex(null);
-    };
+    }, []);
 
-    const goToNext = () => {
+    const goToNext = useCallback(() => {
         if (selectedProductIndex !== null) {
             setSelectedProductIndex((prevIndex) => (prevIndex! + 1) % products.length);
         }
-    };
+    }, [selectedProductIndex, products.length]);
 
-    const goToPrev = () => {
+    const goToPrev = useCallback(() => {
         if (selectedProductIndex !== null) {
             setSelectedProductIndex((prevIndex) => (prevIndex! - 1 + products.length) % products.length);
         }
-    };
+    }, [selectedProductIndex, products.length]);
 
     useEffect(() => {
         const handleKeyDown = (event: KeyboardEvent) => {
@@ -91,11 +93,27 @@ const HeroParallax = ({ products }: { products: Product[] }) => {
         return () => {
             window.removeEventListener('keydown', handleKeyDown);
         };
-    }, [selectedProductIndex]);
+    }, [selectedProductIndex, goToNext, goToPrev, closeModal]);
+
+    // Memoized click handler factory
+    const handleProductClick = useCallback((product: Product) => {
+        const originalIndex = products.findIndex(p => p.thumbnail === product.thumbnail);
+        if (originalIndex !== -1) {
+            openModal(originalIndex);
+        }
+    }, [products, openModal]);
+
     return (
         <>
             <div className="fixed inset-0 z-0">
-                <img src="/images/events-backdrop.png" alt="Background" className="w-full h-full object-cover opacity-75" />
+                <Image 
+                    src="/images/events-backdrop.png" 
+                    alt="Background" 
+                    fill
+                    className="object-cover opacity-75"
+                    priority
+                    quality={60}
+                />
             </div>
             <div
                 ref={ref}
@@ -121,62 +139,44 @@ const HeroParallax = ({ products }: { products: Product[] }) => {
                     className=""
                 >
                     <motion.div className="flex flex-row-reverse space-x-reverse space-x-20 mb-20">
-                        {[...firstRow, ...firstRow].map((product, index) => (
+                        {firstRow.map((product, index) => (
                             <ProductCard
                                 product={product}
                                 translate={translateX}
-                                key={`first-${index}-${product.title}`}
-                                onClick={() => {
-                                    const originalIndex = products.findIndex(p => p.thumbnail === product.thumbnail && p.title === product.title);
-                                    if (originalIndex !== -1) {
-                                        openModal(originalIndex)
-                                    }
-                                }}
+                                key={`first-${index}-${product.thumbnail}`}
+                                onClick={() => handleProductClick(product)}
+                                isPriority={true}
                             />
                         ))}
                     </motion.div>
                     <motion.div className="flex flex-row mb-20 space-x-20">
-                        {[...secondRow, ...secondRow].map((product, index) => (
+                        {secondRow.map((product, index) => (
                             <ProductCard
                                 product={product}
                                 translate={translateXReverse}
-                                key={`second-${index}-${product.title}`}
-                                onClick={() => {
-                                    const originalIndex = products.findIndex(p => p.thumbnail === product.thumbnail && p.title === product.title);
-                                    if (originalIndex !== -1) {
-                                        openModal(originalIndex)
-                                    }
-                                }}
+                                key={`second-${index}-${product.thumbnail}`}
+                                onClick={() => handleProductClick(product)}
+                                isPriority={true}
                             />
                         ))}
                     </motion.div>
                     <motion.div className="flex flex-row-reverse space-x-reverse space-x-20 mb-20">
-                        {[...thirdRow, ...thirdRow].map((product, index) => (
+                        {thirdRow.map((product, index) => (
                             <ProductCard
                                 product={product}
                                 translate={translateX}
-                                key={`third-${index}-${product.title}`}
-                                onClick={() => {
-                                    const originalIndex = products.findIndex(p => p.thumbnail === product.thumbnail && p.title === product.title);
-                                    if (originalIndex !== -1) {
-                                        openModal(originalIndex)
-                                    }
-                                }}
+                                key={`third-${index}-${product.thumbnail}`}
+                                onClick={() => handleProductClick(product)}
                             />
                         ))}
                     </motion.div>
                     <motion.div className="flex flex-row space-x-20">
-                        {[...fourthRow, ...fourthRow].map((product, index) => (
+                        {fourthRow.map((product, index) => (
                             <ProductCard
                                 product={product}
                                 translate={translateXReverse}
-                                key={`fourth-${index}-${product.title}`}
-                                onClick={() => {
-                                    const originalIndex = products.findIndex(p => p.thumbnail === product.thumbnail && p.title === product.title);
-                                    if (originalIndex !== -1) {
-                                        openModal(originalIndex)
-                                    }
-                                }}
+                                key={`fourth-${index}-${product.thumbnail}`}
+                                onClick={() => handleProductClick(product)}
                             />
                         ))}
                     </motion.div>
@@ -192,21 +192,26 @@ const HeroParallax = ({ products }: { products: Product[] }) => {
                         onClick={closeModal}
                     >
                         <motion.div
-                            initial={{ scale: 0.5, opacity: 0 }}
+                            initial={{ scale: 0.9, opacity: 0 }}
                             animate={{ scale: 1, opacity: 1 }}
-                            exit={{ scale: 0.5, opacity: 0 }}
-                            transition={{ duration: 0.3 }}
+                            exit={{ scale: 0.9, opacity: 0 }}
+                            transition={{ duration: 0.2 }}
                             className="relative max-w-4xl max-h-[90vh] w-full"
                             onClick={(e) => e.stopPropagation()}
                         >
-                            <img
+                            <Image
                                 src={products[selectedProductIndex].thumbnail}
-                                alt={products[selectedProductIndex].title}
+                                alt={products[selectedProductIndex].title || "Gallery image"}
+                                width={1200}
+                                height={800}
                                 className="object-contain w-full h-full rounded-lg shadow-2xl"
+                                unoptimized
                             />
-                            <div className="absolute top-0 left-0 p-4 text-white text-lg font-bold bg-black/50 rounded-br-lg">
-                                {products[selectedProductIndex].title}
-                            </div>
+                            {products[selectedProductIndex].title && (
+                                <div className="absolute top-0 left-0 p-4 text-white text-lg font-bold bg-black/50 rounded-br-lg">
+                                    {products[selectedProductIndex].title}
+                                </div>
+                            )}
                         </motion.div>
                         <button onClick={closeModal} className="absolute top-4 right-4 text-white hover:text-gray-300 z-50">
                             <svg className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -247,36 +252,49 @@ interface ProductCardProps {
     product: Product;
     translate: MotionValue<number>;
     onClick: () => void;
+    isPriority?: boolean;
 }
 
-const ProductCard = ({ product, translate, onClick }: ProductCardProps) => {
+const ProductCard = memo(({ product, translate, onClick, isPriority = false }: ProductCardProps) => {
+    const [isLoaded, setIsLoaded] = useState(false);
+
     return (
         <motion.div
-            style={{ x: translate }}
+            style={{ 
+                x: translate,
+                willChange: "transform",
+            }}
             whileHover={{ y: -20 }}
-            key={product.title}
-            className="group/product h-48 w-[15rem] md:h-96 md:w-[30rem] relative flex-shrink-0 cursor-pointer"
+            transition={{ type: "tween", duration: 0.2, ease: "easeOut" }}
+            key={product.thumbnail}
+            className="group/product h-48 w-[15rem] md:h-96 md:w-[30rem] relative flex-shrink-0 cursor-pointer transform-gpu"
             onClick={onClick}
         >
-            <div className="block group-hover/product:shadow-2xl w-full h-full">
-                <img
+            <div className="block group-hover/product:shadow-2xl w-full h-full relative">
+                <div className={`absolute inset-0 bg-gray-800 rounded-lg ${isLoaded ? 'hidden' : 'animate-pulse'}`} />
+                <Image
                     src={product.thumbnail}
-                    height="600"
-                    width="600"
-                    className="object-cover object-center absolute h-full w-full inset-0 rounded-lg"
-                    alt={product.title}
-                    onError={(e) => {
-                        (e.target as HTMLImageElement).src = `https://placehold.co/600x600/000000/FFFFFF?text=${product.title.replace(/\s/g, '+')}`;
-                    }}
+                    alt={product.title || "Gallery image"}
+                    fill
+                    sizes="(max-width: 768px) 240px, 480px"
+                    className={`object-cover object-center rounded-lg transition-opacity duration-300 ${isLoaded ? 'opacity-100' : 'opacity-0'}`}
+                    priority={isPriority}
+                    loading={isPriority ? undefined : "lazy"}
+                    unoptimized
+                    onLoad={() => setIsLoaded(true)}
                 />
             </div>
             <div className="absolute inset-0 h-full w-full opacity-0 group-hover/product:opacity-80 bg-black pointer-events-none transition-opacity duration-300 rounded-lg"></div>
-            <h2 className="absolute bottom-4 left-4 opacity-0 group-hover/product:opacity-100 text-white transition-opacity duration-300">
-                {product.title}
-            </h2>
+            {product.title && (
+                <h2 className="absolute bottom-4 left-4 opacity-0 group-hover/product:opacity-100 text-white transition-opacity duration-300">
+                    {product.title}
+                </h2>
+            )}
         </motion.div>
     );
-};
+});
+
+ProductCard.displayName = 'ProductCard';
 
 export default function SurrealGallery() {
     const products: Product[] = [

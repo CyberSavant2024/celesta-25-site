@@ -29,7 +29,7 @@ export default function Navbar() {
                         alt="Celesta"
                         width={110}
                         height={35}
-                        className="-translate-y-1"
+                        className="-translate-y-1 h-auto"
                     />
                 </Link>
 

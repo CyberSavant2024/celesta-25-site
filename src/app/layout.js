@@ -7,21 +7,24 @@ import FloatingCart from "@/components/floatcart";
 import { Toaster } from "react-hot-toast";
 import Footer from "@/components/footer";
 import Cart from "@/components/Cart";
-import Head from "next/head"; // ✅ import this
+
+export const metadata = {
+  title: "Celesta 2025 - IIT Patna's Annual Tech Fest",
+  description: "Join us at Celesta 2025, the annual technical festival of IIT Patna featuring robotics, coding, workshops and celebrity performances.",
+};
 
 export default function RootLayout({ children }) {
   return (
     <html lang="en">
-      <Head>
-        {/* ✅ Font Awesome for LinkedIn + Twitter(X) icons */}
+      <head>
+        {/* Font Awesome for LinkedIn + Twitter(X) icons */}
         <link
           rel="stylesheet"
           href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"
-          integrity="sha512-bxKjXx8ZGRo5nF2VhA3YyZsCeVQWkZk/UPJ1Gx3Q03YQmMx1jZqH5ZCsyuXr7p0v9zZIoN5Ue7Onx9V4Y41Iiw=="
           crossOrigin="anonymous"
           referrerPolicy="no-referrer"
         />
-      </Head>
+      </head>
 
       <body>
         <AuthUserProvider>

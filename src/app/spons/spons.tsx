@@ -120,6 +120,345 @@ const CodingBitsCelebration = () => {
     return <div className="fixed inset-0 z-50 pointer-events-none">{particles}</div>;
 };
 
+// Space Shooter Game Component
+const SpaceShooterGame = ({ onClose }: { onClose: () => void }) => {
+    const canvasRef = useRef<HTMLCanvasElement>(null);
+    const [score, setScore] = useState(0);
+    const [gameOver, setGameOver] = useState(false);
+    const [highScore, setHighScore] = useState(0);
+    const [gameKey, setGameKey] = useState(0); // Key to force re-mount
+    const gameRef = useRef<{
+        player: { x: number; y: number; width: number; height: number };
+        bullets: { x: number; y: number; width: number; height: number }[];
+        enemies: { x: number; y: number; width: number; height: number; speed: number; type: number }[];
+        stars: { x: number; y: number; speed: number; size: number }[];
+        keys: { [key: string]: boolean };
+        animationId: number | null;
+        lastEnemySpawn: number;
+        lastBulletTime: number;
+        lastFrameTime: number;
+        score: number;
+        gameOver: boolean;
+    }>({
+        player: { x: 0, y: 0, width: 40, height: 40 },
+        bullets: [],
+        enemies: [],
+        stars: [],
+        keys: {},
+        animationId: null,
+        lastEnemySpawn: 0,
+        lastBulletTime: 0,
+        lastFrameTime: 0,
+        score: 0,
+        gameOver: false,
+    });
+
+    useEffect(() => {
+        const stored = localStorage.getItem('celestaSpaceHighScore');
+        if (stored) setHighScore(parseInt(stored));
+    }, []);
+
+    useEffect(() => {
+        const canvas = canvasRef.current;
+        if (!canvas) return;
+
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return;
+
+        const game = gameRef.current;
+        
+        // Set canvas size
+        canvas.width = Math.min(800, window.innerWidth - 40);
+        canvas.height = Math.min(600, window.innerHeight - 200);
+
+        // Initialize player position
+        game.player.x = canvas.width / 2 - game.player.width / 2;
+        game.player.y = canvas.height - 60;
+
+        // Initialize stars
+        game.stars = Array.from({ length: 50 }, () => ({
+            x: Math.random() * canvas.width,
+            y: Math.random() * canvas.height,
+            speed: 1 + Math.random() * 2,
+            size: Math.random() * 2 + 1,
+        }));
+
+        const handleKeyDown = (e: KeyboardEvent) => {
+            game.keys[e.key] = true;
+            if (e.key === ' ') {
+                e.preventDefault();
+            }
+        };
+
+        const handleKeyUp = (e: KeyboardEvent) => {
+            game.keys[e.key] = false;
+        };
+
+        // Also handle click/tap to shoot
+        const handleClick = () => {
+            if (!game.gameOver) {
+                game.bullets.push({
+                    x: game.player.x + game.player.width / 2 - 3,
+                    y: game.player.y,
+                    width: 6,
+                    height: 15,
+                });
+            }
+        };
+
+        window.addEventListener('keydown', handleKeyDown);
+        window.addEventListener('keyup', handleKeyUp);
+        canvas.addEventListener('click', handleClick);
+
+        const spawnEnemy = () => {
+            const types = [0, 1, 2]; // Different enemy types
+            const type = types[Math.floor(Math.random() * types.length)];
+            game.enemies.push({
+                x: Math.random() * (canvas.width - 40),
+                y: -40,
+                width: 35,
+                height: 35,
+                speed: 1 + Math.random() * 1.5 + game.score / 1000, // Slower base speed
+                type,
+            });
+        };
+
+        const drawPlayer = () => {
+            ctx.fillStyle = '#00ffff';
+            ctx.beginPath();
+            ctx.moveTo(game.player.x + game.player.width / 2, game.player.y);
+            ctx.lineTo(game.player.x, game.player.y + game.player.height);
+            ctx.lineTo(game.player.x + game.player.width, game.player.y + game.player.height);
+            ctx.closePath();
+            ctx.fill();
+            
+            // Glow effect
+            ctx.shadowColor = '#00ffff';
+            ctx.shadowBlur = 15;
+            ctx.fill();
+            ctx.shadowBlur = 0;
+        };
+
+        const drawBullet = (bullet: typeof game.bullets[0]) => {
+            ctx.fillStyle = '#ffff00';
+            ctx.shadowColor = '#ffff00';
+            ctx.shadowBlur = 10;
+            ctx.fillRect(bullet.x, bullet.y, bullet.width, bullet.height);
+            ctx.shadowBlur = 0;
+        };
+
+        const drawEnemy = (enemy: typeof game.enemies[0]) => {
+            const colors = ['#ff4444', '#ff8800', '#ff00ff'];
+            ctx.fillStyle = colors[enemy.type];
+            ctx.shadowColor = colors[enemy.type];
+            ctx.shadowBlur = 10;
+            
+            // Draw robot-like enemy
+            ctx.fillRect(enemy.x + 5, enemy.y, enemy.width - 10, enemy.height - 10);
+            ctx.fillRect(enemy.x, enemy.y + 10, enemy.width, enemy.height - 20);
+            // Eyes
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(enemy.x + 8, enemy.y + 15, 6, 6);
+            ctx.fillRect(enemy.x + enemy.width - 14, enemy.y + 15, 6, 6);
+            ctx.shadowBlur = 0;
+        };
+
+        const drawStars = () => {
+            game.stars.forEach(star => {
+                ctx.fillStyle = `rgba(255, 255, 255, ${0.5 + Math.random() * 0.5})`;
+                ctx.fillRect(star.x, star.y, star.size, star.size);
+                star.y += star.speed;
+                if (star.y > canvas.height) {
+                    star.y = 0;
+                    star.x = Math.random() * canvas.width;
+                }
+            });
+        };
+
+        const checkCollision = (rect1: any, rect2: any) => {
+            return rect1.x < rect2.x + rect2.width &&
+                   rect1.x + rect1.width > rect2.x &&
+                   rect1.y < rect2.y + rect2.height &&
+                   rect1.y + rect1.height > rect2.y;
+        };
+
+        const gameLoop = (timestamp: number) => {
+            if (game.gameOver) return;
+
+            // Frame rate limiting for consistent speed
+            const deltaTime = timestamp - game.lastFrameTime;
+            if (deltaTime < 16) { // Cap at ~60fps
+                game.animationId = requestAnimationFrame(gameLoop);
+                return;
+            }
+            game.lastFrameTime = timestamp;
+
+            ctx.fillStyle = '#0a0a1a';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Draw stars background
+            drawStars();
+
+            // Move player (slower speed)
+            const speed = 4;
+            if ((game.keys['ArrowLeft'] || game.keys['a'] || game.keys['A']) && game.player.x > 0) {
+                game.player.x -= speed;
+            }
+            if ((game.keys['ArrowRight'] || game.keys['d'] || game.keys['D']) && game.player.x < canvas.width - game.player.width) {
+                game.player.x += speed;
+            }
+
+            // Auto-fire when holding space (with cooldown)
+            if ((game.keys[' '] || game.keys['ArrowUp']) && timestamp - game.lastBulletTime > 200) {
+                game.bullets.push({
+                    x: game.player.x + game.player.width / 2 - 3,
+                    y: game.player.y,
+                    width: 6,
+                    height: 15,
+                });
+                game.lastBulletTime = timestamp;
+            }
+
+            // Update and draw bullets (slower)
+            game.bullets = game.bullets.filter(bullet => {
+                bullet.y -= 5;
+                if (bullet.y < -bullet.height) return false;
+                drawBullet(bullet);
+                return true;
+            });
+
+            // Spawn enemies (slower spawn rate)
+            if (timestamp - game.lastEnemySpawn > Math.max(800, 2000 - game.score * 1.5)) {
+                spawnEnemy();
+                game.lastEnemySpawn = timestamp;
+            }
+
+            // Update and draw enemies
+            game.enemies = game.enemies.filter(enemy => {
+                enemy.y += enemy.speed;
+
+                // Check collision with player
+                if (checkCollision(enemy, game.player)) {
+                    game.gameOver = true;
+                    setGameOver(true);
+                    if (game.score > highScore) {
+                        setHighScore(game.score);
+                        localStorage.setItem('celestaSpaceHighScore', game.score.toString());
+                    }
+                    return false;
+                }
+
+                // Check collision with bullets
+                for (let i = game.bullets.length - 1; i >= 0; i--) {
+                    if (checkCollision(enemy, game.bullets[i])) {
+                        game.bullets.splice(i, 1);
+                        game.score += 10;
+                        setScore(game.score);
+                        return false;
+                    }
+                }
+
+                if (enemy.y > canvas.height) {
+                    return false;
+                }
+
+                drawEnemy(enemy);
+                return true;
+            });
+
+            // Draw player
+            drawPlayer();
+
+            // Draw score
+            ctx.fillStyle = '#ffffff';
+            ctx.font = 'bold 20px monospace';
+            ctx.fillText(`Score: ${game.score}`, 10, 30);
+            ctx.fillText(`High: ${Math.max(highScore, game.score)}`, canvas.width - 120, 30);
+
+            // Draw controls hint
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
+            ctx.font = '12px monospace';
+            ctx.fillText('← → or A/D to move | SPACE or ↑ or CLICK to shoot', 10, canvas.height - 10);
+
+            game.animationId = requestAnimationFrame(gameLoop);
+        };
+
+        game.animationId = requestAnimationFrame(gameLoop);
+
+        return () => {
+            window.removeEventListener('keydown', handleKeyDown);
+            window.removeEventListener('keyup', handleKeyUp);
+            canvas.removeEventListener('click', handleClick);
+            if (game.animationId) cancelAnimationFrame(game.animationId);
+        };
+    }, [highScore, gameKey]);
+
+    const restartGame = () => {
+        // Reset game ref state
+        const game = gameRef.current;
+        if (game.animationId) {
+            cancelAnimationFrame(game.animationId);
+        }
+        game.bullets = [];
+        game.enemies = [];
+        game.score = 0;
+        game.gameOver = false;
+        game.lastEnemySpawn = 0;
+        game.lastBulletTime = 0;
+        game.lastFrameTime = 0;
+        game.keys = {};
+        
+        // Reset React state
+        setScore(0);
+        setGameOver(false);
+        
+        // Increment key to force useEffect to re-run and restart game loop
+        setGameKey(prev => prev + 1);
+    };
+
+    return (
+        <motion.div
+            className="fixed inset-0 z-50 bg-black/90 backdrop-blur-sm flex flex-col items-center justify-center p-4"
+            initial={{ opacity: 0 }} 
+            animate={{ opacity: 1 }} 
+            exit={{ opacity: 0 }}
+        >
+            <div className="text-center mb-4">
+                <h2 className="text-3xl font-bold text-cyan-400 mb-2">🚀 CELESTA DEFENDER</h2>
+                <p className="text-gray-400 text-sm">← → or A/D to move • SPACE / ↑ / CLICK to shoot</p>
+            </div>
+            
+            <div className="relative">
+                <canvas 
+                    ref={canvasRef} 
+                    className="border-2 border-cyan-500/50 rounded-lg shadow-2xl shadow-cyan-500/20"
+                />
+                
+                {gameOver && (
+                    <div className="absolute inset-0 bg-black/80 flex flex-col items-center justify-center rounded-lg">
+                        <h3 className="text-4xl font-bold text-red-500 mb-4">GAME OVER</h3>
+                        <p className="text-2xl text-white mb-2">Score: {score}</p>
+                        <p className="text-lg text-cyan-400 mb-6">High Score: {highScore}</p>
+                        <button 
+                            onClick={restartGame}
+                            className="bg-cyan-500 hover:bg-cyan-400 text-black font-bold py-3 px-8 rounded-lg transition-colors mb-2"
+                        >
+                            Play Again
+                        </button>
+                    </div>
+                )}
+            </div>
+
+            <button 
+                onClick={onClose} 
+                className="mt-4 bg-gray-700 hover:bg-gray-600 text-white font-bold py-2 px-6 rounded-lg transition-colors"
+            >
+                Close Game
+            </button>
+        </motion.div>
+    );
+};
+
 export default function SponsorsPage() {
     const [showGame, setShowGame] = useState(false);
     const [showCelebration, setShowCelebration] = useState(false);
@@ -358,19 +697,7 @@ export default function SponsorsPage() {
             </div>
             <AnimatePresence>
                 {showCelebration && <CodingBitsCelebration />}
-                {showGame && (
-                    <motion.div
-                        className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex flex-col items-center justify-center"
-                        initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-                    >
-                        <div className="w-full h-full max-w-4xl max-h-[80vh] bg-slate-900/50 backdrop-blur-lg border border-slate-700 rounded-lg shadow-2xl p-4 flex flex-col">
-                            <iframe src="https://dino-chrome.com/" title="Chrome Dino Game" className="w-full h-full border-0 rounded-md" />
-                            <button onClick={() => setShowGame(false)} className="mt-4 bg-gray-300 text-black font-bold py-2 px-4 rounded-lg hover:bg-gray-400 transition-colors">
-                                Close Game
-                            </button>
-                        </div>
-                    </motion.div>
-                )}
+                {showGame && <SpaceShooterGame onClose={() => setShowGame(false)} />}
             </AnimatePresence>
             <style jsx>{`
                 @keyframes ping-slow {
