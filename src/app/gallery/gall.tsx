@@ -28,15 +28,15 @@ const HeroParallax = ({ products }: { products: Product[] }) => {
         offset: ["start start", "end start"],
     });
 
-    // Optimized spring config for smooth animations
-    const springConfig = { stiffness: 120, damping: 30, restDelta: 0.001 };
+    // Lighter spring config for better performance
+    const springConfig = { stiffness: 80, damping: 25, mass: 0.5 };
 
     const translateX = useSpring(
-        useTransform(scrollYProgress, [0, 1], [0, 500]),
+        useTransform(scrollYProgress, [0, 1], [0, 400]),
         springConfig
     );
     const translateXReverse = useSpring(
-        useTransform(scrollYProgress, [0, 1], [0, -500]),
+        useTransform(scrollYProgress, [0, 1], [0, -400]),
         springConfig
     );
     const rotateX = useSpring(
@@ -52,7 +52,7 @@ const HeroParallax = ({ products }: { products: Product[] }) => {
         springConfig
     );
     const translateY = useSpring(
-        useTransform(scrollYProgress, [0, 1], [-100, 100]),
+        useTransform(scrollYProgress, [0, 1], [-50, 50]),
         springConfig
     );
     const [selectedProductIndex, setSelectedProductIndex] = useState<number | null>(null);
@@ -135,8 +135,10 @@ const HeroParallax = ({ products }: { products: Product[] }) => {
                         rotateZ,
                         translateY,
                         opacity,
+                        willChange: "transform",
+                        transform: "translateZ(0)",
                     }}
-                    className=""
+                    className="backface-hidden"
                 >
                     <motion.div className="flex flex-row-reverse space-x-reverse space-x-20 mb-20">
                         {firstRow.map((product, index) => (
@@ -263,30 +265,31 @@ const ProductCard = memo(({ product, translate, onClick, isPriority = false }: P
             style={{ 
                 x: translate,
                 willChange: "transform",
+                transform: "translateZ(0)",
             }}
-            whileHover={{ y: -20 }}
-            transition={{ type: "tween", duration: 0.2, ease: "easeOut" }}
+            whileHover={{ y: -10, scale: 1.02 }}
+            transition={{ type: "tween", duration: 0.15, ease: "easeOut" }}
             key={product.thumbnail}
-            className="group/product h-48 w-[15rem] md:h-96 md:w-[30rem] relative flex-shrink-0 cursor-pointer transform-gpu"
+            className="group/product h-48 w-[15rem] md:h-96 md:w-[30rem] relative flex-shrink-0 cursor-pointer backface-hidden"
             onClick={onClick}
         >
-            <div className="block group-hover/product:shadow-2xl w-full h-full relative">
-                <div className={`absolute inset-0 bg-gray-800 rounded-lg ${isLoaded ? 'hidden' : 'animate-pulse'}`} />
+            <div className="block w-full h-full relative rounded-lg overflow-hidden">
+                <div className={`absolute inset-0 bg-gray-800 ${isLoaded ? 'hidden' : 'animate-pulse'}`} />
                 <Image
                     src={product.thumbnail}
                     alt={product.title || "Gallery image"}
                     fill
                     sizes="(max-width: 768px) 240px, 480px"
-                    className={`object-cover object-center rounded-lg transition-opacity duration-300 ${isLoaded ? 'opacity-100' : 'opacity-0'}`}
+                    className={`object-cover object-center transition-opacity duration-200 ${isLoaded ? 'opacity-100' : 'opacity-0'}`}
                     priority={isPriority}
                     loading={isPriority ? undefined : "lazy"}
                     unoptimized
                     onLoad={() => setIsLoaded(true)}
                 />
+                <div className="absolute inset-0 bg-black/0 group-hover/product:bg-black/60 transition-colors duration-200" />
             </div>
-            <div className="absolute inset-0 h-full w-full opacity-0 group-hover/product:opacity-80 bg-black pointer-events-none transition-opacity duration-300 rounded-lg"></div>
             {product.title && (
-                <h2 className="absolute bottom-4 left-4 opacity-0 group-hover/product:opacity-100 text-white transition-opacity duration-300">
+                <h2 className="absolute bottom-4 left-4 opacity-0 group-hover/product:opacity-100 text-white transition-opacity duration-200">
                     {product.title}
                 </h2>
             )}
