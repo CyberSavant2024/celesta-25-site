@@ -25,6 +25,12 @@ export default function Home() {
   const [isMuted, setIsMuted] = useState(true);
   const videoRef = useRef(null);
 
+  // Refs for performer slideshow images (using useRef instead of DOM queries)
+  const performerCurrentRefs = useRef([]);
+  const performerNextRefs = useRef([]);
+  const performerNameRefs = useRef([]);
+  const [currentIndices, setCurrentIndices] = useState([0, 0, 0, 0]);
+
   const toggleAudio = () => {
     if (videoRef.current) {
       videoRef.current.muted = !isMuted;
@@ -100,56 +106,56 @@ export default function Home() {
     }
   }, []);
 
-  // Image slideshow
+  // Image slideshow using refs instead of DOM queries
   useEffect(() => {
+    const animatingFlags = performers.map(() => false);
+
     const intervals = performers.map((performer, idx) => {
-      let currentIndex = 0;
-      let isAnimating = false;
-
       return setInterval(() => {
-        if (isAnimating) return;
+        if (animatingFlags[idx]) return;
 
-        const currentImg = document.querySelector(
-          `#performer-${idx}-img-current`
-        );
-        const nextImg = document.querySelector(`#performer-${idx}-img-next`);
+        const currentImg = performerCurrentRefs.current[idx];
+        const nextImg = performerNextRefs.current[idx];
 
         if (currentImg && nextImg) {
-          isAnimating = true;
-          const nextIndex = (currentIndex + 1) % performer.images.length;
-          const direction = idx % 2 === 0 ? "right" : "left";
+          animatingFlags[idx] = true;
+          
+          setCurrentIndices((prev) => {
+            const newIndices = [...prev];
+            const nextIndex = (newIndices[idx] + 1) % performer.images.length;
+            const direction = idx % 2 === 0 ? "right" : "left";
 
-          // Set next image offscreen
-          nextImg.src = performer.images[nextIndex];
-          nextImg.style.transition = "none";
-          nextImg.style.transform =
-            direction === "right" ? "translateX(-100%)" : "translateX(100%)";
-          nextImg.style.zIndex = "2";
+            // Set next image offscreen
+            nextImg.style.transition = "none";
+            nextImg.style.transform =
+              direction === "right" ? "translateX(-100%)" : "translateX(100%)";
+            nextImg.style.zIndex = "2";
 
-          // Force reflow
-          nextImg.offsetHeight;
+            // Force reflow
+            nextImg.offsetHeight;
 
-          // Animate transition
-          requestAnimationFrame(() => {
-            currentImg.style.transition = "transform 1s ease-in-out";
-            nextImg.style.transition = "transform 1s ease-in-out";
+            // Animate transition
+            requestAnimationFrame(() => {
+              currentImg.style.transition = "transform 1s ease-in-out";
+              nextImg.style.transition = "transform 1s ease-in-out";
 
-            currentImg.style.transform =
-              direction === "right" ? "translateX(100%)" : "translateX(-100%)";
-            nextImg.style.transform = "translateX(0)";
-            currentImg.style.zIndex = "1";
+              currentImg.style.transform =
+                direction === "right" ? "translateX(100%)" : "translateX(-100%)";
+              nextImg.style.transform = "translateX(0)";
+              currentImg.style.zIndex = "1";
+            });
+
+            setTimeout(() => {
+              currentImg.style.transition = "none";
+              currentImg.style.transform = "translateX(0)";
+              currentImg.style.zIndex = "2";
+              nextImg.style.zIndex = "1";
+              animatingFlags[idx] = false;
+            }, 1050);
+
+            newIndices[idx] = nextIndex;
+            return newIndices;
           });
-
-          setTimeout(() => {
-            currentImg.src = performer.images[nextIndex];
-            currentImg.style.transition = "none";
-            currentImg.style.transform = "translateX(0)";
-            currentImg.style.zIndex = "2";
-            nextImg.style.zIndex = "1";
-
-            currentIndex = nextIndex;
-            isAnimating = false;
-          }, 1050);
         }
       }, 3000);
     });
@@ -157,10 +163,10 @@ export default function Home() {
     return () => intervals.forEach((interval) => clearInterval(interval));
   }, [performers]);
 
-  // Animate performer names sliding from left/right
+  // Animate performer names sliding from left/right using refs
   useEffect(() => {
     performers.forEach((performer, idx) => {
-      const el = document.querySelector(`#performer-name-${idx}`);
+      const el = performerNameRefs.current[idx];
       if (!el) return;
 
       const xOffset = idx % 2 === 0 ? -window.innerWidth : window.innerWidth;
@@ -213,20 +219,25 @@ export default function Home() {
               key={idx}
               className="relative w-full h-[500px] overflow-hidden reveal-section"
             >
-              {/* Slideshow */}
-              <img
-                id={`performer-${idx}-img-current`}
+              {/* Slideshow - Using next/image with refs */}
+              <Image
+                ref={(el) => (performerCurrentRefs.current[idx] = el)}
                 className="absolute inset-0 w-full h-full object-cover"
-                src={performer.images[0]}
+                src={performer.images[currentIndices[idx]]}
                 alt={performer.name}
-                style={{ zIndex: 2 }}
+                fill
+                sizes="100vw"
+                priority={idx === 0}
+                style={{ zIndex: 2, objectFit: "cover" }}
               />
-              <img
-                id={`performer-${idx}-img-next`}
+              <Image
+                ref={(el) => (performerNextRefs.current[idx] = el)}
                 className="absolute inset-0 w-full h-full object-cover"
-                src={performer.images[0]}
+                src={performer.images[(currentIndices[idx] + 1) % performer.images.length]}
                 alt={performer.name}
-                style={{ transform: "translateX(100%)", zIndex: 1 }}
+                fill
+                sizes="100vw"
+                style={{ transform: "translateX(100%)", zIndex: 1, objectFit: "cover" }}
               />
 
               {/* Overlay */}
@@ -234,11 +245,12 @@ export default function Home() {
 
               {/* Artist Name */}
               <div
-                className={`absolute inset-0 flex items-center z-20 px-4 sm:px-10 md:px-20 justify-${idx % 2 === 0 ? "start" : "end"
-                  }`}
+                className={`absolute inset-0 flex items-center z-20 px-4 sm:px-10 md:px-20 ${
+                  idx % 2 === 0 ? "justify-start" : "justify-end"
+                }`}
               >
                 <h2
-                  id={`performer-name-${idx}`}
+                  ref={(el) => (performerNameRefs.current[idx] = el)}
                   className="text-white font-bold text-4xl sm:text-5xl md:text-6xl lg:text-7xl tracking-wider uppercase drop-shadow-2xl break-words state-wide"
                 >
                   {performer.name}
